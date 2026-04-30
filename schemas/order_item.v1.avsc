@@ -1,0 +1,66 @@
+{
+  "type": "record",
+  "name": "OrderItemPurchased",
+  "namespace": "com.ironstitch.events",
+  "doc": "Version 1 contract for one purchased item within an Olist order.",
+  "fields": [
+    {
+      "name": "event_id",
+      "type": "string",
+      "doc": "Unique id for this emitted event, used for deduplication."
+    },
+    {
+      "name": "event_time",
+      "type": "string",
+      "doc": "UTC timestamp when the event was produced, formatted as ISO-8601."
+    },
+    {
+      "name": "event_version",
+      "type": "int",
+      "default": 1,
+      "doc": "Schema/event version emitted by the producer."
+    },
+    {
+      "name": "order_id",
+      "type": "string",
+      "doc": "Olist order identifier."
+    },
+    {
+      "name": "order_item_id",
+      "type": "int",
+      "doc": "Line-item number inside the order."
+    },
+    {
+      "name": "product_id",
+      "type": "string",
+      "doc": "Olist product identifier for the purchased item."
+    },
+    {
+      "name": "seller_id",
+      "type": "string",
+      "doc": "Olist seller identifier for the purchased item."
+    },
+    {
+      "name": "price",
+      "type": "double",
+      "doc": "Item price in the event currency."
+    },
+    {
+      "name": "freight_value",
+      "type": "double",
+      "doc": "Shipping cost for this item in the event currency."
+    },
+    {
+      "name": "currency",
+      "type": "string",
+      "default": "BRL",
+      "doc": "ISO-4217 currency code. Olist prices are Brazilian Real."
+    },
+    {
+      "name": "source",
+      "type": "string",
+      "default": "olist",
+      "doc": "Source system or dataset that produced this event."
+    }
+  ]
+}
