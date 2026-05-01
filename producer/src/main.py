@@ -1,7 +1,10 @@
 import argparse
 import os
+from datetime import datetime, timezone
+from pathlib import Path
 from uuid import uuid4
 
+import pandas as pd
 from six.moves import input
 from confluent_kafka import Producer
 from confluent_kafka.schema_registry import SchemaRegistryClient
@@ -10,8 +13,54 @@ from confluent_kafka.serialization import MessageField, SerializationContext, St
 
 # Configuration 
 
-BROKER = os.getenv("BROKER", "localhost:9092")
+BROKER = os.getenv("BROKER", "localhost:19092")
 SCHEMA_REGISTRY_URL = os.getenv("SCHEMA_REGISTRY_URL", "http://localhost:18081")
 TOPIC = os.getenv("topic", "orders.v1")
-SCV_PATH = os.getenv("schema_path", "schemas/order_item.v1.avsc")
+CSV_PATH = os.getenv("csv_path", "data/olist/olist_order_items_dataset.csv")
+SCHEMA_PATH = "schemas/order_item.v1.avsc"
 
+# Load Schema
+schema_str = Path(SCHEMA_PATH).read_text()
+# src that connects to the schema registry
+schema_registry_client = SchemaRegistryClient({
+    "url": SCHEMA_REGISTRY_URL
+    })
+# Converst dict to bytes
+avro_serializer = AvroSerializer(schema_registry_client, schema_str)
+string_serializer = StringSerializer('utf_8')
+
+# Create Producer
+producer = Producer({
+    "bootstrap.servers": BROKER,
+})
+
+# Delivery Callback
+def deliver_report(err, msg):
+    if err:
+        print(f"Delivery failed : {err}")
+    else:
+        print(f"Delivred to {msg.topic()}")
+
+# Read CSV 
+for chunk in pd.read_csv(CSV_PATH, chunksize=1000):
+    for _, row in chunk.iterrows():
+        event = {
+            "event_id": str(uuid4()),
+            "event_time": datetime.now(timezone.utc).isoformat(),
+            "order_id": str(row["order_id"]),
+            "order_item_id": int(row["order_item_id"]),
+            "product_id": str(row["product_id"]),
+            "seller_id": str(row["seller_id"]),
+            "price": float(row["price"]),
+            "freight_value": float(row["freight_value"]),
+        }
+        # Produce event 
+        producer.produce(
+            topic=TOPIC,
+            key=string_serializer(event["order_id"]),
+            value=avro_serializer(event, SerializationContext(TOPIC, MessageField.VALUE)),
+            on_delivery=deliver_report,
+        )
+        producer.poll(0)
+
+producer.flush()
