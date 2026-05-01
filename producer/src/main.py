@@ -16,7 +16,7 @@ from confluent_kafka.serialization import MessageField, SerializationContext, St
 BROKER = os.getenv("BROKER", "localhost:19092")
 SCHEMA_REGISTRY_URL = os.getenv("SCHEMA_REGISTRY_URL", "http://localhost:18081")
 TOPIC = os.getenv("topic", "orders.v1")
-CSV_PATH = os.getenv("csv_path", "data/olist/olist_order_items_dataset.csv")
+CSV_PATH = os.getenv("csv_path", "data/olist_order_items_dataset.csv")
 SCHEMA_PATH = "schemas/order_item.v1.avsc"
 
 # Load Schema
@@ -25,7 +25,7 @@ schema_str = Path(SCHEMA_PATH).read_text()
 schema_registry_client = SchemaRegistryClient({
     "url": SCHEMA_REGISTRY_URL
     })
-# Converst dict to bytes
+# Convert dict to bytes
 avro_serializer = AvroSerializer(schema_registry_client, schema_str)
 string_serializer = StringSerializer('utf_8')
 
@@ -39,7 +39,7 @@ def deliver_report(err, msg):
     if err:
         print(f"Delivery failed : {err}")
     else:
-        print(f"Delivred to {msg.topic()}")
+        print(f"Delivered to {msg.topic()}")
 
 # Read CSV 
 for chunk in pd.read_csv(CSV_PATH, chunksize=1000):
