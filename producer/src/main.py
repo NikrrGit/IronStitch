@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
+from src.event_factory import row_to_event
+
 import pandas as pd
 from six.moves import input
 from confluent_kafka import Producer
@@ -44,16 +46,7 @@ def deliver_report(err, msg):
 # Read CSV 
 for chunk in pd.read_csv(CSV_PATH, chunksize=1000):
     for _, row in chunk.iterrows():
-        event = {
-            "event_id": str(uuid4()),
-            "event_time": datetime.now(timezone.utc).isoformat(),
-            "order_id": str(row["order_id"]),
-            "order_item_id": int(row["order_item_id"]),
-            "product_id": str(row["product_id"]),
-            "seller_id": str(row["seller_id"]),
-            "price": float(row["price"]),
-            "freight_value": float(row["freight_value"]),
-        }
+        event = row_to_event(row)
         # Produce event 
         producer.produce(
             topic=TOPIC,
