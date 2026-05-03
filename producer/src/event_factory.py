@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from uuid import uuid4
 
-def row_to_event(row): -> dict:
+def row_to_event(row) -> dict:
     return  {
             "event_id": str(uuid4()),
             "event_time": datetime.now(timezone.utc).isoformat(),
