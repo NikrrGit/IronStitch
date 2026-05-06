@@ -47,26 +47,9 @@ stack-ready: up wait
 
 smoke: stack-ready topics
 	@echo "Preparing smoke input CSV (first 25 rows)..."
-	@python3 - <<'PY'
-import csv
-from pathlib import Path
-
-src = Path("data/olist_order_items_dataset.csv")
-dst = Path("data/smoke_order_items.csv")
-
-if not src.exists():
-    raise SystemExit(f"Missing source CSV: {src}")
-
-with src.open(newline="", encoding="utf-8") as fin, dst.open("w", newline="", encoding="utf-8") as fout:
-    reader = csv.reader(fin)
-    writer = csv.writer(fout)
-    for i, row in enumerate(reader):
-        writer.writerow(row)
-        if i >= 25:
-            break
-
-print(f"Wrote {dst}")
-PY
+	@[ -f data/olist_order_items_dataset.csv ] || (echo "Missing source CSV: data/olist_order_items_dataset.csv" && exit 1)
+	@head -n 26 data/olist_order_items_dataset.csv > data/smoke_order_items.csv
+	@echo "Wrote data/smoke_order_items.csv"
 	@echo "Producing smoke events..."
 	@csv_path=data/smoke_order_items.csv python3 producer/src/main.py
 	@echo "Waiting for Spark to process batches..."

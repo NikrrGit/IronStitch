@@ -1,4 +1,5 @@
 import os
+import logging
 from pathlib import Path
 
 from pyspark.sql import SparkSession
@@ -16,6 +17,7 @@ spark = (
     .getOrCreate()
 )
 spark.sparkContext.setLogLevel("WARN")
+logging.getLogger("org.apache.spark.sql.kafka010.consumer.KafkaDataConsumer").setLevel(logging.ERROR)
 
 # read the kafka topic
 df = (
