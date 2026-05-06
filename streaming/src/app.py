@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import coalesce, col, concat_ws, lit, struct, to_json, when
+from pyspark.sql.functions import coalesce, col, concat_ws, expr, lit, struct, to_json, when
 from pyspark.sql.avro.functions import from_avro
 
 from sinks.duckdb import write_to_duckdb
@@ -30,9 +30,12 @@ df = (
 schema_path = Path(__file__).resolve().parents[2] / "schemas" / "order_item.v1.avsc"
 schema = schema_path.read_text()
 
+# strip Confluent wire format prefix (1 magic byte + 4 schema-id bytes) before Avro decode
+avro_payload = expr("substring(value, 6, length(value) - 5)")
+
 decoded = df.select(
     col("key").cast("string").alias("key"),
-    from_avro(col("value"), schema).alias("data"),
+    from_avro(avro_payload, schema).alias("data"),
 )
 
 # flatten

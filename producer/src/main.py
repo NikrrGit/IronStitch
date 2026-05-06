@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
-from src.event_factory import row_to_event
+from event_factory import row_to_event
 
 import pandas as pd
 from six.moves import input
