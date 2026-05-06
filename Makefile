@@ -1,4 +1,4 @@
-.PHONY: up down restart ps logs topics clean
+.PHONY: up down restart ps logs topics stream stream-logs clean
 
 COMPOSE := docker compose
 REDPANDA := $(COMPOSE) exec redpanda
@@ -20,6 +20,12 @@ logs:
 topics:
 	$(REDPANDA) rpk topic create orders.v1 orders.dlq -p 3 || true
 	$(REDPANDA) rpk topic list
+
+stream:
+	$(COMPOSE) up -d spark
+
+stream-logs:
+	$(COMPOSE) logs -f spark --tail=200
 
 clean:
 	$(COMPOSE) down -v

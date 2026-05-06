@@ -1,11 +1,14 @@
+import os
 from pathlib import Path
 
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import array, array_remove, coalesce, col, concat_ws, lit, struct, to_json, when
+from pyspark.sql.functions import coalesce, col, concat_ws, lit, struct, to_json, when
 from pyspark.sql.avro.functions import from_avro
 
 from sinks.duckdb import write_to_duckdb
 
+
+KAFKA_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP", "localhost:19092")
 
 spark = (
     SparkSession.builder.appName("IronStitchStreaming")
@@ -17,7 +20,7 @@ spark.sparkContext.setLogLevel("WARN")
 # read the kafka topic
 df = (
     spark.readStream.format("kafka")
-    .option("kafka.bootstrap.servers", "localhost:19092")
+    .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP)
     .option("subscribe", "orders.v1")
     .option("startingOffsets", "earliest")
     .load()
@@ -40,17 +43,12 @@ with_error = parsed.withColumn(
     "error_reason",
     concat_ws(
         ";",
-        array_remove(
-            array(
-                when(col("order_id").isNull(), lit("missing_order_id")),
-                when(col("order_item_id").isNull(), lit("missing_order_item_id")),
-                when(col("product_id").isNull(), lit("missing_product_id")),
-                when(col("seller_id").isNull(), lit("missing_seller_id")),
-                when(col("price").isNull(), lit("missing_price")),
-                when(col("freight_value").isNull(), lit("missing_freight_value")),
-            ),
-            lit(None),
-        ),
+        when(col("order_id").isNull(), lit("missing_order_id")),
+        when(col("order_item_id").isNull(), lit("missing_order_item_id")),
+        when(col("product_id").isNull(), lit("missing_product_id")),
+        when(col("seller_id").isNull(), lit("missing_seller_id")),
+        when(col("price").isNull(), lit("missing_price")),
+        when(col("freight_value").isNull(), lit("missing_freight_value")),
     ),
 )
 
@@ -72,7 +70,7 @@ dlq_payload = invalid_rows.select(
 
 dlq_query = (
     dlq_payload.writeStream.format("kafka")
-    .option("kafka.bootstrap.servers", "localhost:19092")
+    .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP)
     .option("topic", "orders.dlq")
     .option("checkpointLocation", "data/checkpoints/orders_v1_dlq")
     .start()

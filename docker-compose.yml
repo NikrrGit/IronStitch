@@ -54,8 +54,39 @@ services:
     mem_limit: 256m
     networks: [ironstitch]
 
+  spark:
+    image: apache/spark:3.5.8-java17-python3
+    container_name: ironstitch-spark
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    user: root
+    entrypoint: ["/bin/bash"]
+    working_dir: /opt/ironstitch
+    environment:
+      KAFKA_BOOTSTRAP: redpanda:9092
+      HOME: /tmp
+      PIP_ROOT_USER_ACTION: ignore
+    volumes:
+      - ./streaming:/opt/ironstitch/streaming
+      - ./schemas:/opt/ironstitch/schemas
+      - ./data:/opt/ironstitch/data
+      - spark-ivy:/tmp/.ivy2
+    command:
+      - -lc
+      - |
+        pip install --quiet duckdb==1.0.0 pandas==2.2.2 && \
+        /opt/spark/bin/spark-submit \
+          --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.8,org.apache.spark:spark-avro_2.12:3.5.8 \
+          --conf spark.jars.ivy=/tmp/.ivy2 \
+          --master "local[*]" \
+          /opt/ironstitch/streaming/src/app.py
+    mem_limit: 2g
+    networks: [ironstitch]
+
 volumes:
   redpanda-data:
+  spark-ivy:
 
 networks:
   ironstitch:
