@@ -1,4 +1,4 @@
-.PHONY: up down restart ps logs topics stream stream-logs wait stack-ready smoke smoke-reset clean
+.PHONY: up down restart ps logs topics stream stream-logs wait wait-spark stack-ready smoke smoke-reset clean
 
 COMPOSE := docker compose
 REDPANDA := $(COMPOSE) exec redpanda
@@ -40,9 +40,19 @@ wait:
 	echo "Redpanda did not become healthy in time"; \
 	exit 1
 
-stack-ready: up wait
-	@echo "Giving Spark extra startup time (dependencies + jars)..."
-	@sleep 15
+wait-spark:
+	@echo "Waiting for Spark streaming query to start (up to 180s)..."
+	@for i in $$(seq 1 90); do \
+		if docker logs ironstitch-spark 2>&1 | grep -q "Streaming query made progress\|Initializing sources"; then \
+			echo "Spark streaming is alive"; \
+			exit 0; \
+		fi; \
+		sleep 2; \
+	done; \
+	echo "Spark streaming did not start in time. Check 'make stream-logs'"; \
+	exit 1
+
+stack-ready: up wait wait-spark
 	@$(COMPOSE) ps
 
 smoke: stack-ready topics
@@ -52,10 +62,22 @@ smoke: stack-ready topics
 	@echo "Wrote data/smoke_order_items.csv"
 	@echo "Producing smoke events..."
 	@csv_path=data/smoke_order_items.csv python3 producer/src/main.py
-	@echo "Waiting for Spark to process batches..."
-	@sleep 20
-	@echo "DuckDB row count:"
-	@$(COMPOSE) exec spark python -c "import duckdb; print(duckdb.connect('/opt/ironstitch/data/duckdb/orders.duckdb').execute('SELECT COUNT(*) FROM orders').fetchall())"
+	@echo "Polling DuckDB for rows (up to 120s)..."
+	@COUNT=0; \
+	for i in $$(seq 1 60); do \
+		if [ -f data/duckdb/orders.duckdb ]; then \
+			COUNT=$$($(COMPOSE) exec -T spark python3 -c "import duckdb; con=duckdb.connect('/opt/ironstitch/data/duckdb/orders.duckdb'); t=con.execute(\"SELECT COUNT(*) FROM information_schema.tables WHERE table_name='orders'\").fetchone()[0]; print(con.execute('SELECT COUNT(*) FROM orders').fetchone()[0] if t else 0)" 2>/dev/null | tr -d '[:space:]'); \
+		fi; \
+		if [ -n "$$COUNT" ] && [ "$$COUNT" -gt 0 ]; then \
+			echo "DuckDB row count: $$COUNT"; \
+			break; \
+		fi; \
+		sleep 2; \
+	done; \
+	if [ -z "$$COUNT" ] || [ "$$COUNT" -eq 0 ]; then \
+		echo "DuckDB still empty after waiting. Check 'make stream-logs'."; \
+		exit 1; \
+	fi
 	@echo "DLQ topic offsets:"
 	@$(REDPANDA) rpk topic describe orders.dlq | sed -n '1,120p'
 	@echo "Smoke run complete."
